@@ -15,4 +15,8 @@ public interface DisguisedBlockEntity extends BlockEntity {
      */
     @Nullable BlockState getDisguisedMaterial(@Nullable String face);
 
+    default @Nullable BlockState getDisguisedBlockState() {
+        return getDisguisedMaterial(null);
+    }
+
 }

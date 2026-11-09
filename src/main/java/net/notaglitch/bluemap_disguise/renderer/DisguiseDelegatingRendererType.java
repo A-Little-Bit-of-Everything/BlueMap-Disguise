@@ -16,7 +16,9 @@ import de.bluecolored.bluemap.core.world.BlockState;
 import de.bluecolored.bluemap.core.world.block.BlockNeighborhood;
 import net.notaglitch.bluemap_disguise.blockentity.DisguisedBlockEntity;
 
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class DisguiseDelegatingRendererType implements BlockRendererType {
@@ -25,6 +27,10 @@ public class DisguiseDelegatingRendererType implements BlockRendererType {
 
     public DisguiseDelegatingRendererType(BlockRendererType delegate) {
         this.delegate = delegate;
+    }
+
+    public BlockRendererType getDelegate() {
+        return delegate;
     }
 
     @Override
@@ -66,6 +72,19 @@ public class DisguiseDelegatingRendererType implements BlockRendererType {
             Key defaultKey = Key.bluemap("default");
             BlockRendererType existingDefault = map.get(defaultKey);
             if (existingDefault != null && !(existingDefault instanceof DisguiseDelegatingRendererType)) {
+                if (existingDefault.getClass().getSimpleName().equals("CTMDelegatingRendererType")) {
+                    try {
+                        Method getDelegate = existingDefault.getClass().getMethod("getDelegate");
+                        BlockRendererType inner = (BlockRendererType) getDelegate.invoke(existingDefault);
+                        if (!(inner instanceof DisguiseDelegatingRendererType)) {
+                            BlockRendererType wrapped = new DisguiseDelegatingRendererType(inner);
+                            Constructor<?> ctor = existingDefault.getClass().getConstructor(BlockRendererType.class);
+                            map.put(defaultKey, (BlockRendererType) ctor.newInstance(wrapped));
+                            Logger.global.logInfo("[BlueMap-Disguise] Successfully hooked under BlueMap-CTM DEFAULT BlockRenderer.");
+                            return;
+                        }
+                    } catch (Throwable ignored) {}
+                }
                 map.put(defaultKey, new DisguiseDelegatingRendererType(existingDefault));
                 Logger.global.logInfo("[BlueMap-Disguise] Successfully hooked into BlueMap DEFAULT BlockRenderer.");
             }

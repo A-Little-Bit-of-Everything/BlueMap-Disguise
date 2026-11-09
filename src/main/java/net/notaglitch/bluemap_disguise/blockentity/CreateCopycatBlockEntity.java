@@ -38,8 +38,29 @@ public class CreateCopycatBlockEntity extends MCABlockEntity implements Disguise
         @NBTName("Material")
         private @Nullable BlockState materialUpper;
 
+        @NBTName("consumedItem")
+        private @Nullable ConsumedItem consumedItem;
+
         public @Nullable BlockState getMaterial() {
-            return material != null ? material : materialUpper;
+            if (material != null && !isBase(material)) return material;
+            if (materialUpper != null && !isBase(materialUpper)) return materialUpper;
+            if (consumedItem != null && consumedItem.getId() != null && !consumedItem.getId().isEmpty()) {
+                String id = consumedItem.getId();
+                if (!id.equals("minecraft:air") && !id.contains("copycat_base")) {
+                    try {
+                        return new BlockState(de.bluecolored.bluemap.core.util.Key.parse(id));
+                    } catch (Throwable ignored) {}
+                }
+            }
+            return null;
+        }
+
+        @Getter
+        @EqualsAndHashCode
+        @ToString
+        public static class ConsumedItem {
+            @NBTName("id")
+            private @Nullable String id;
         }
     }
 
