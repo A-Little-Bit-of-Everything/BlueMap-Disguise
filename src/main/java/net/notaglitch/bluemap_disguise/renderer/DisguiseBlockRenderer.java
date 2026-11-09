@@ -214,6 +214,15 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         int sunLight = Math.max(blockLightData.getSkyLight(), facedLightData.getSkyLight());
         int blockLight = Math.max(blockLightData.getBlockLight(), facedLightData.getBlockLight());
 
+        if (sunLight == 0 && blockLight == 0) {
+            for (Direction dir : Direction.values()) {
+                Vector3i dv = dir.toVector();
+                LightData d = currentBlock.getNeighborBlock(dv.getX(), dv.getY(), dv.getZ()).getLightData();
+                sunLight = Math.max(sunLight, d.getSkyLight());
+                blockLight = Math.max(blockLight, d.getBlockLight());
+            }
+        }
+
         if (currentBlock.isRemoveIfCave() &&
                 (renderSettings.isCaveDetectionUsesBlockLight() ? Math.max(blockLight, sunLight) : sunLight) == 0
         ) return;
@@ -540,6 +549,28 @@ public class DisguiseBlockRenderer implements BlockRenderer {
             }
         } else if (id.contains("fence")) {
             buildDisguisedBox(6, 0, 6, 10, 16, 10, blockModel.initialize(), defaultMaterial);
+        } else if (id.contains("step")) {
+            boolean top = "top".equalsIgnoreCase(props.get("half"));
+            String facing = props.getOrDefault("facing", "north").toLowerCase();
+            float minY = top ? 8 : 0;
+            float maxY = top ? 16 : 8;
+            switch (facing) {
+                case "north" -> buildDisguisedBox(0, minY, 0, 16, maxY, 8, blockModel.initialize(), defaultMaterial);
+                case "south" -> buildDisguisedBox(0, minY, 8, 16, maxY, 16, blockModel.initialize(), defaultMaterial);
+                case "west" -> buildDisguisedBox(0, minY, 0, 8, maxY, 16, blockModel.initialize(), defaultMaterial);
+                case "east" -> buildDisguisedBox(8, minY, 0, 16, maxY, 16, blockModel.initialize(), defaultMaterial);
+                default -> buildDisguisedBox(0, minY, 0, 16, maxY, 8, blockModel.initialize(), defaultMaterial);
+            }
+        } else if (id.contains("panel") && !id.contains("half_panel")) {
+            String facing = props.getOrDefault("facing", "south").toLowerCase();
+            switch (facing) {
+                case "north" -> buildDisguisedBox(0, 0, 0, 16, 16, 3, blockModel.initialize(), defaultMaterial);
+                case "south" -> buildDisguisedBox(0, 0, 13, 16, 16, 16, blockModel.initialize(), defaultMaterial);
+                case "west" -> buildDisguisedBox(0, 0, 0, 3, 16, 16, blockModel.initialize(), defaultMaterial);
+                case "east" -> buildDisguisedBox(13, 0, 0, 16, 16, 16, blockModel.initialize(), defaultMaterial);
+                case "up" -> buildDisguisedBox(0, 13, 0, 16, 16, 16, blockModel.initialize(), defaultMaterial);
+                default -> buildDisguisedBox(0, 0, 0, 16, 3, 16, blockModel.initialize(), defaultMaterial);
+            }
         } else if (id.contains("door")) {
             String facing = props.getOrDefault("facing", "north").toLowerCase();
             switch (facing) {
@@ -598,6 +629,15 @@ public class DisguiseBlockRenderer implements BlockRenderer {
 
         int sunLight = Math.max(blockLightData.getSkyLight(), facedLightData.getSkyLight());
         int blockLight = Math.max(blockLightData.getBlockLight(), facedLightData.getBlockLight());
+
+        if (sunLight == 0 && blockLight == 0) {
+            for (Direction dir : Direction.values()) {
+                Vector3i dv = dir.toVector();
+                LightData d = currentBlock.getNeighborBlock(dv.getX(), dv.getY(), dv.getZ()).getLightData();
+                sunLight = Math.max(sunLight, d.getSkyLight());
+                blockLight = Math.max(blockLight, d.getBlockLight());
+            }
+        }
 
         if (currentBlock.isRemoveIfCave() &&
                 (renderSettings.isCaveDetectionUsesBlockLight() ? Math.max(blockLight, sunLight) : sunLight) == 0
