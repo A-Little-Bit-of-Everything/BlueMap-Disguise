@@ -14,10 +14,13 @@ import net.notaglitch.bluemap_disguise.blockentity.TomsPaintedBlockEntity;
 import net.notaglitch.bluemap_disguise.renderer.DisguiseBlockRendererType;
 import net.notaglitch.bluemap_disguise.renderer.DisguiseDelegatingRendererType;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 @Mod(BlueMapDisguise.MOD_ID)
 public class BlueMapDisguise {
 
     public static final String MOD_ID = "bluemap_disguise";
+    private static final AtomicBoolean API_LISTENER_REGISTERED = new AtomicBoolean(false);
 
     public BlueMapDisguise(IEventBus modEventBus) {
         modEventBus.addListener(this::commonSetup);
@@ -32,13 +35,15 @@ public class BlueMapDisguise {
         registerBlockEntityTypes();
         registerRenderers();
 
-        // Listen for BlueMap API enablement if loaded as plugin
-        try {
-            BlueMapAPI.onEnable(api -> {
-                Logger.global.logInfo("[BlueMap-Disguise] BlueMap API enabled, verifying disguise hooks...");
-                initializeIntegrations();
-            });
-        } catch (Throwable ignored) {}
+        // Listen for BlueMap API enablement if loaded as plugin (register once only!)
+        if (API_LISTENER_REGISTERED.compareAndSet(false, true)) {
+            try {
+                BlueMapAPI.onEnable(api -> {
+                    registerBlockEntityTypes();
+                    registerRenderers();
+                });
+            } catch (Throwable ignored) {}
+        }
     }
 
     private static void registerBlockEntityTypes() {
