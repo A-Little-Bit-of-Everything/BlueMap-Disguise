@@ -82,6 +82,8 @@ public class DisguiseDelegatingRendererType implements BlockRendererType {
                             map.put(defaultKey, (BlockRendererType) ctor.newInstance(wrapped));
                             Logger.global.logInfo("[BlueMap-Disguise] Successfully hooked under BlueMap-CTM DEFAULT BlockRenderer.");
                             return;
+                        } else {
+                            return;
                         }
                     } catch (Throwable ignored) {}
                 }
