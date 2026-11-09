@@ -54,8 +54,8 @@ neoForge {
 
 dependencies {
     compileOnly files('../BlueMap/api/build/libs/bluemap-api-2.8.2-3-dirty.jar')
-    compileOnly files('../BlueMap/core/build/libs/core-5.29-21-dirty.jar')
-    compileOnly files('../BlueMap/common/build/libs/common-5.29-21-dirty.jar')
+    compileOnly files('../BlueMap/core/build/libs/core-5.29-28-dirty.jar')
+    compileOnly files('../BlueMap/common/build/libs/common-5.29-28-dirty.jar')
     compileOnly 'de.bluecolored:bluenbt:3.5.1'
     compileOnly 'com.flowpowered:flow-math:1.0.3'
 
