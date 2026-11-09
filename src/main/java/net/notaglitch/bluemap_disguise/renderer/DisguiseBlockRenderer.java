@@ -1,6 +1,5 @@
 package net.notaglitch.bluemap_disguise.renderer;
 
-import com.flowpowered.math.TrigMath;
 import com.flowpowered.math.vector.Vector3f;
 import com.flowpowered.math.vector.Vector3i;
 import com.flowpowered.math.vector.Vector4f;
@@ -62,7 +61,8 @@ public class DisguiseBlockRenderer implements BlockRenderer {
     private final VectorM3f faceRotationVector = new VectorM3f(0, 0, 0);
     private final MatrixM4f modelElementTransform = new MatrixM4f();
 
-    private final Map<BlockState, ResourcePath<Texture>> textureCache = new ConcurrentHashMap<>();
+    private record MaterialFaceKey(BlockState material, @Nullable Direction face) {}
+    private final Map<MaterialFaceKey, ResourcePath<Texture>> textureCache = new ConcurrentHashMap<>();
 
     private BlockNeighborhood currentBlock;
     private Variant currentVariant;
@@ -96,7 +96,7 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         }
 
         BlockState defaultMaterial = dbe.getDisguisedMaterial(null);
-        if (defaultMaterial == null || defaultMaterial.isAir()) {
+        if (defaultMaterial == null || defaultMaterial.isAir() || isBaseBlock(defaultMaterial)) {
             delegateRenderer.render(block, variant, blockModel, color);
             return;
         }
@@ -111,6 +111,11 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         // Shaped disguise (step, panel, slab, stair, beam, fence, cable):
         // Render the copycat model elements using the disguised material's textures & tints.
         renderShapedDisguise(block, variant, blockModel, color, dbe, defaultMaterial);
+    }
+
+    private boolean isBaseBlock(BlockState state) {
+        String id = state.getId().getFormatted();
+        return id.contains("copycat_base") || id.equals("minecraft:air");
     }
 
     private boolean isFullBlockDisguise(BlockState state) {
@@ -231,10 +236,15 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         // Determine face material (support multi-state copycat face materials)
         String faceName = faceDir.name().toLowerCase();
         BlockState faceMaterial = currentDisguisedBe.getDisguisedMaterial(faceName);
-        if (faceMaterial == null || faceMaterial.isAir()) faceMaterial = defaultMaterial;
+        if (faceMaterial == null || faceMaterial.isAir() || isBaseBlock(faceMaterial)) {
+            faceMaterial = defaultMaterial;
+        }
 
         // Resolve face texture from the material
         ResourcePath<Texture> texturePath = resolveMaterialTexture(faceMaterial, faceDir);
+        if (texturePath == null && faceMaterial != defaultMaterial) {
+            texturePath = resolveMaterialTexture(defaultMaterial, faceDir);
+        }
         if (texturePath == null) {
             // fallback to copycat's own texture
             texturePath = face.getTexture().getTexturePath(key -> currentCopycatModel.getTextures().get(key));
@@ -331,8 +341,9 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         }
     }
 
-    private @Nullable ResourcePath<Texture> resolveMaterialTexture(BlockState material, Direction faceDir) {
-        ResourcePath<Texture> cached = textureCache.get(material);
+    private @Nullable ResourcePath<Texture> resolveMaterialTexture(BlockState material, @Nullable Direction faceDir) {
+        MaterialFaceKey cacheKey = new MaterialFaceKey(material, faceDir);
+        ResourcePath<Texture> cached = textureCache.get(cacheKey);
         if (cached != null) return cached;
 
         var materialStateResource = resourcePack.getBlockState(material);
@@ -342,34 +353,53 @@ public class DisguiseBlockRenderer implements BlockRenderer {
         materialStateResource.forEach(material, 0, 0, 0, materialVariants::add);
         if (materialVariants.isEmpty()) return null;
 
-        Variant matVariant = materialVariants.get(0);
-        Model matModel = matVariant.getModel().getResource(modelProvider);
-        if (matModel == null) return null;
+        for (Variant matVariant : materialVariants) {
+            Model matModel = matVariant.getModel().getResource(modelProvider);
+            if (matModel == null) continue;
 
-        Map<String, TextureVariable> textures = matModel.getTextures();
-        if (textures.isEmpty()) return null;
+            Map<String, TextureVariable> textures = matModel.getTextures();
+            if (textures == null || textures.isEmpty()) continue;
 
-        // Try directional names first
-        String[] preferredKeys;
-        if (faceDir == Direction.UP) preferredKeys = new String[]{"top", "up", "end", "all", "particle"};
-        else if (faceDir == Direction.DOWN) preferredKeys = new String[]{"bottom", "down", "end", "all", "particle"};
-        else preferredKeys = new String[]{"side", "front", "north", "south", "east", "west", "all", "particle"};
+            // Preferred directional names
+            String[] preferredKeys;
+            if (faceDir == Direction.UP) preferredKeys = new String[]{"top", "up", "end", "all", "texture", "particle"};
+            else if (faceDir == Direction.DOWN) preferredKeys = new String[]{"bottom", "down", "end", "all", "texture", "particle"};
+            else preferredKeys = new String[]{"side", "front", "north", "south", "east", "west", "all", "texture", "particle"};
 
-        TextureVariable selectedVar = null;
-        for (String key : preferredKeys) {
-            selectedVar = textures.get(key);
-            if (selectedVar != null) break;
+            TextureVariable selectedVar = null;
+            for (String key : preferredKeys) {
+                selectedVar = textures.get(key);
+                if (selectedVar != null) break;
+            }
+
+            if (selectedVar == null && faceDir != null) {
+                selectedVar = textures.get(faceDir.name().toLowerCase());
+            }
+
+            if (selectedVar == null) {
+                Element[] elements = matModel.getElements();
+                if (elements != null) {
+                    for (Element el : elements) {
+                        Face face = faceDir != null ? el.getFaces().get(faceDir) : null;
+                        if (face != null) {
+                            selectedVar = face.getTexture();
+                            if (selectedVar != null) break;
+                        }
+                    }
+                }
+            }
+
+            if (selectedVar == null) {
+                selectedVar = textures.values().iterator().next();
+            }
+
+            ResourcePath<Texture> path = selectedVar.getTexturePath(textures::get);
+            if (path != null && !path.getFormatted().contains("copycat_base")) {
+                textureCache.put(cacheKey, path);
+                return path;
+            }
         }
-
-        if (selectedVar == null) {
-            selectedVar = textures.values().iterator().next();
-        }
-
-        ResourcePath<Texture> path = selectedVar.getTexturePath(textures::get);
-        if (path != null) {
-            textureCache.put(material, path);
-        }
-        return path;
+        return null;
     }
 
     private boolean requiresMaterialTint(BlockState state) {
